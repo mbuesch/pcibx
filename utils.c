@@ -93,7 +93,7 @@ int prinfo(const char *fmt, ...)
 		return 0;
 
 	va_start(va, fmt);
-	ret = vfprintf(stderr, fmt, va);
+	ret = vfprintf(stdout, fmt, va);
 	va_end(va);
 
 	return ret;
@@ -117,7 +117,7 @@ int prdata(const char *fmt, ...)
 	va_list va;
 
 	va_start(va, fmt);
-	ret = vfprintf(stderr, fmt, va);
+	ret = vfprintf(stdout, fmt, va);
 	va_end(va);
 
 	return ret;

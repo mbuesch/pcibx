@@ -79,8 +79,8 @@ static void plot_text(const char *fmt, ...)
 	va_list va;
 
 	va_start(va, fmt);
-	fprintf(stderr, "# ");
-	vfprintf(stderr, fmt, va);
+	fprintf(stdout, "# ");
+	vfprintf(stdout, fmt, va);
 	va_end(va);
 }
 
