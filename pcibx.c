@@ -239,7 +239,6 @@ static void print_banner(int forceprint)
 
 static void print_usage(int argc, char **argv)
 {
-	print_banner(1);
 	prdata("Usage: %s [OPTION]\n", argv[0]);
 	prdata("  -V|--verbose          Be verbose\n");
 	prdata("  -v|--version          Print version\n");
@@ -514,7 +513,9 @@ static int parse_args(int argc, char **argv)
 			print_banner(1);
 			return 1;
 		} else if (arg_match(argv, &i, "--help", "-h", 0)) {
-			goto out_usage;
+			print_banner(1);
+			print_usage(argc, argv);
+			return 1;
 		} else if (arg_match(argv, &i, "--verbose", "-V", 0)) {
 			cmdargs.verbose = 1;
 		} else if (arg_match(argv, &i, "--port", "-p", &param)) {
@@ -627,17 +628,16 @@ static int parse_args(int argc, char **argv)
 
 		} else {
 			prerror("Unrecognized argument: %s\n", argv[i]);
-			goto out_usage;
+			goto error;
 		}
 	}
 	if (cmdargs.nr_commands == 0) {
-		prerror("No device commands specified.\n");
+		prerror("No device commands specified.\n\n");
+		print_usage(argc, argv);
 		goto error;
 	}
 	return 0;
 
-out_usage:
-	print_usage(argc, argv);
 error:
 	return -1;
 }
