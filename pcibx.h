@@ -62,7 +62,7 @@ struct pcibx_command {
 struct cmdline_args {
 	int verbose;
 	int sched;
-	int cycle;
+	int cycle_delay;
 	int nrcycle;
 
 	const char *port;

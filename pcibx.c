@@ -244,9 +244,8 @@ static void print_usage(int argc, char **argv)
 	prinfo("  -p|--port /dev/parportX  Parport device (Default: /dev/parport0)\n");
 	prinfo("  -P|--pci1 BOOL        If true, PCI_1 (default), otherwise PCI_2. (See JP15)\n");
 	prinfo("  -s|--sched POLICY     Scheduling policy (normal, fifo, rr)\n");
-	prinfo("  -c|--cycle DELAY      Execute the commands in a cycle and delay\n");
-	prinfo("                        DELAY msecs after each cycle\n");
-	prinfo("  -n|--nrcycle COUNT    Cycle COUNT times. 0 == infinite (default)\n");
+	prinfo("  -n|--nrcycle COUNT    Cycle COUNT times. 0 = infinite (default: 1)\n");
+	prinfo("  -d|--delay DELAY      DELAY msecs after each cycle. Default 0\n");
 	prinfo("\n");
 	prinfo("Device commands\n");
 	prinfo("  --cmd-glob ON/OFF     Turn Global power ON/OFF (does not turn ON UUT Voltages)\n");
@@ -503,7 +502,8 @@ static int parse_args(int argc, char **argv)
 	cmdargs.port = "/dev/parport0";
 	cmdargs.is_PCI_1 = 1;
 	cmdargs.sched = SCHED_OTHER;
-	cmdargs.cycle = -1;
+	cmdargs.cycle_delay = 0;
+	cmdargs.nrcycle = 1;
 
 	for (i = 1; i < argc; i++) {
 		if (arg_match(argv, &i, "--version", "-v", 0)) {
@@ -535,15 +535,14 @@ static int parse_args(int argc, char **argv)
 				prerror("Invalid parameter to --sched\n");
 				goto error;
 			}
-		} else if (arg_match(argv, &i, "--cycle", "-c", &param)) {
-			err = parse_int(param, &cmdargs.cycle, "--cycle");
+		} else if (arg_match(argv, &i, "--delay", "-d", &param)) {
+			err = parse_int(param, &cmdargs.cycle_delay, "--delay");
 			if (err)
 				goto error;
 		} else if (arg_match(argv, &i, "--nrcycle", "-n", &param)) {
 			err = parse_int(param, &cmdargs.nrcycle, "--nrcycle");
 			if (err)
 				goto error;
-
 		} else if (arg_match(argv, &i, "--cmd-glob", 0, &param)) {
 			err = add_boolcommand(CMD_GLOB, param, "--cmd-glob");
 			if (err)
@@ -693,14 +692,12 @@ int main(int argc, char **argv)
 		err = send_commands(&dev);
 		if (err)
 			goto out_exit_dev;
-		if (cmdargs.cycle < 0)
-			break;
 		if (nrcycle > 0)
 			nrcycle--;
 		if (nrcycle == 0)
 			break;
-		if (cmdargs.cycle)
-			msleep(cmdargs.cycle);
+		if (cmdargs.cycle_delay)
+			msleep(cmdargs.cycle_delay);
 	}
 
 out_exit_dev:
