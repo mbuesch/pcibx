@@ -360,7 +360,7 @@ void pcibx_cmd_rst(struct pcibx_device *dev, double sec)
 
 	prsendinfo("RST#");
 	sec /= 2.56;
-	sec *= 1000000;
+	sec *= 1000000.0;
 	tmp = sec;
 	tmp &= 0x1FFFFF;
 	tmp |= (1 << 23);
