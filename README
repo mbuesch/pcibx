@@ -33,14 +33,3 @@ WARNING: Read the fakephp Manual. Be very careful when hotplugging
 	 2) Turn the UUT Powers on the Extender OFF.
 	 3) Unplug the device from the physical PCI slot.
 	 To plug a device in, reverse the order of the steps.
-
-
-Bugs / Issues
-------------
-
-The Parallel Port is currently accessed through userspace outb()
-and inb() calls. These functions are not available on all
-architectures. When porting this application to something else
-than X86, a kernel level driver might be required.
-But that's a very minor issue, as just the lowlevel functions in
-pcibx_device.c have to be replaced.

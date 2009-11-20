@@ -2,7 +2,7 @@
 
   Catalyst PCIBX32 PCI Extender control utility
 
-  Copyright (c) 2006,2007 Michael Buesch <mb@bu3sch.de>
+  Copyright (c) 2006-2009 Michael Buesch <mb@bu3sch.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -58,7 +58,8 @@
 #define PCIBX_STATUS_DUTASS	(1 << 4)
 
 struct pcibx_device {
-	unsigned short port;
+	const char *port;
+	int fd;
 	uint8_t regoffset;
 };
 
@@ -72,6 +73,11 @@ enum measure_id {
 	MEASURE_A12	= 0x0E,
 	MEASURE_A33	= 0x0F,
 };
+
+int pcibx_device_init(struct pcibx_device *dev,
+		      const char *port,
+		      int is_pci1);
+void pcibx_device_exit(struct pcibx_device *dev);
 
 void pcibx_cmd_global_pwr(struct pcibx_device *dev, int on);
 void pcibx_cmd_uut_pwr(struct pcibx_device *dev, int on);

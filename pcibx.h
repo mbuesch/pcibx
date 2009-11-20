@@ -65,7 +65,7 @@ struct cmdline_args {
 	int cycle;
 	int nrcycle;
 
-	unsigned short port;
+	const char *port;
 	int is_PCI_1;
 
 #define MAX_COMMAND	512

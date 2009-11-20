@@ -2,7 +2,7 @@
 
   Catalyst PCIBX32 PCI Extender control utility
 
-  Copyright (c) 2006,2007 Michael Buesch <mb@bu3sch.de>
+  Copyright (c) 2006-2009 Michael Buesch <mb@bu3sch.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -26,47 +26,154 @@
 #include "utils.h"
 
 #include <string.h>
-#include <sys/io.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/ioctl.h>
 
+#ifdef __linux__
+# include <linux/ppdev.h>
+#endif
+
+/* Parport control register bits */
+#define PPCTL_IRQEN	(1 << 4)
+#define PPCTL_READ	(1 << 5)
+#define PPCTL_DATAMASK	0xF
+
+
+static uint8_t parport_read_data(struct pcibx_device *dev)
+{
+	uint8_t res = 0;
+
+#if defined(__linux__)
+	if (ioctl(dev->fd, PPRDATA, &res))
+		prerror("Failed to read the parallel port data register\n");
+#else
+# error "Operating system not supported"
+#endif
+
+	return res;
+}
+
+static void parport_write_data(struct pcibx_device *dev, uint8_t value)
+{
+#if defined(__linux__)
+	if (ioctl(dev->fd, PPWDATA, &value))
+		prerror("Failed to write the parallel port data register\n");
+#else
+# error "Operating system not supported"
+#endif
+}
+
+static void parport_write_control(struct pcibx_device *dev,
+				  uint8_t mask, uint8_t value)
+{
+#if defined(__linux__)
+	struct ppdev_frob_struct frob = {
+		.mask = mask,
+		.val = value,
+	};
+	int direction;
+
+	if (mask & PPCTL_READ) {
+		direction = !!(value & PPCTL_READ);
+		if (ioctl(dev->fd, PPDATADIR, &direction))
+			prerror("Failed to set parallel port data direction\n");
+	}
+	frob.mask &= ~PPCTL_READ;
+	frob.val &= frob.mask;
+	if (ioctl(dev->fd, PPFCONTROL, &frob))
+		prerror("Failed to write the parallel port control register\n");
+#else
+# error "Operating system not supported"
+#endif
+}
+
+static int parport_open(struct pcibx_device *dev, const char *port)
+{
+#if defined(__linux__)
+	int err;
+
+	dev->fd = open(port, O_RDWR);
+	if (dev->fd < 0) {
+		prerror("Could not open parallel port %s: %s\n",
+			port, strerror(errno));
+		return -1;
+	}
+//FIXME
+#if 0
+	err = ioctl(dev->fd, PPEXCL);
+	if (err) {
+		prerror("Failed to gain exclusive access to the parallel port %s: %s\n",
+			port, strerror(err < 0 ? -err : err));
+		close(dev->fd);
+		return -1;
+	}
+#endif
+	err = ioctl(dev->fd, PPCLAIM);
+	if (err) {
+		prerror("Failed to claim the parallel port %s: %s\n",
+			port, strerror(err < 0 ? -err : err));
+		close(dev->fd);
+		return -1;
+	}
+#else
+# error "Operating system not supported"
+#endif
+
+	parport_write_control(dev, PPCTL_DATAMASK | PPCTL_READ | PPCTL_IRQEN, 0xE);
+
+	return 0;
+}
+
+static void parport_close(struct pcibx_device *dev)
+{
+#if defined(__linux__)
+	ioctl(dev->fd, PPRELEASE);
+	close(dev->fd);
+#else
+# error "Operating system not supported"
+#endif
+}
 
 static void pcibx_set_address(struct pcibx_device *dev,
 			      uint8_t address)
 {
-	outb(0xDE, dev->port + 2);
-	outb(address + dev->regoffset, dev->port);
-	outb(0xD6, dev->port + 2);
+	parport_write_control(dev, PPCTL_DATAMASK, 0xE);
+	parport_write_data(dev, address + dev->regoffset);
+	parport_write_control(dev, PPCTL_DATAMASK, 0x6);
 	udelay(100);
-	outb(0xDE, dev->port + 2);
+	parport_write_control(dev, PPCTL_DATAMASK, 0xE);
 }
 
 static void pcibx_write_data(struct pcibx_device *dev,
 			     uint8_t data)
 {
-	outb(data, dev->port);
-	outb(0xDC, dev->port + 2);
+	parport_write_data(dev, data);
+	parport_write_control(dev, PPCTL_DATAMASK, 0xC);
 	udelay(100);
-	outb(0xDE, dev->port + 2);
+	parport_write_control(dev, PPCTL_DATAMASK, 0xE);
 }
 
 static void pcibx_write_data_ext(struct pcibx_device *dev,
 				 uint8_t data)
 {
-	outb(0xDE, dev->port + 2);
-	outb(data, dev->port);
-	outb(0xDC, dev->port + 2);
+	parport_write_control(dev, PPCTL_DATAMASK, 0xE);
+	parport_write_data(dev, data);
+	parport_write_control(dev, PPCTL_DATAMASK, 0xC);
 	msleep(2);
-	outb(0xDE, dev->port + 2);
+	parport_write_control(dev, PPCTL_DATAMASK, 0xE);
 }
 
 static uint8_t pcibx_read_data(struct pcibx_device *dev)
 {
 	uint8_t v;
 
-	outb(0xFF, dev->port + 2);
-	v = inb(dev->port);
-	outb(0xDE, dev->port + 2);
+	parport_write_control(dev, PPCTL_DATAMASK | PPCTL_READ,
+			      PPCTL_READ | 0xF);
+	v = parport_read_data(dev);
+	parport_write_control(dev, PPCTL_DATAMASK | PPCTL_READ, 0xE);
 
 	return v;
 }
@@ -92,6 +199,25 @@ static uint8_t pcibx_read(struct pcibx_device *dev,
 {
 	pcibx_set_address(dev, reg);
 	return pcibx_read_data(dev);
+}
+
+int pcibx_device_init(struct pcibx_device *dev,
+		      const char *port,
+		      int is_pci1)
+{
+	memset(dev, 0, sizeof(*dev));
+	if (is_pci1)
+		dev->regoffset = PCIBX_REGOFFSET_PCI1;
+	else
+		dev->regoffset = PCIBX_REGOFFSET_PCI2;
+
+	return parport_open(dev, port);
+}
+
+void pcibx_device_exit(struct pcibx_device *dev)
+{
+	parport_close(dev);
+	memset(dev, 0, sizeof(*dev));
 }
 
 static void prsendinfo(const char *command)

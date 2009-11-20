@@ -2,7 +2,7 @@
 
   Catalyst PCIBX32 PCI Extender control utility
 
-  Copyright (c) 2006,2007 Michael Buesch <mb@bu3sch.de>
+  Copyright (c) 2006-2009 Michael Buesch <mb@bu3sch.de>
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -27,7 +27,6 @@
 #include <string.h>
 #include <errno.h>
 #include <stdint.h>
-#include <sys/io.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -209,18 +208,6 @@ static int send_commands(struct pcibx_device *dev)
 	return 0;
 }
 
-static int init_device(struct pcibx_device *dev)
-{
-	memset(dev, 0, sizeof(*dev));
-	dev->port = cmdargs.port;
-	if (cmdargs.is_PCI_1)
-		dev->regoffset = PCIBX_REGOFFSET_PCI1;
-	else
-		dev->regoffset = PCIBX_REGOFFSET_PCI2;
-
-	return 0;
-}
-
 static int request_priority(void)
 {
 	struct sched_param param;
@@ -236,30 +223,12 @@ static int request_priority(void)
 	return err;
 }
 
-static int request_permissions(void)
-{
-	int err;
-
-	err = ioperm(cmdargs.port, 1, 1);
-	if (err)
-		goto error;
-	err = ioperm(cmdargs.port + 2, 1, 1);
-	if (err)
-		goto error;
-
-	return err;
-error:
-	prerror("Could not aquire I/O permissions for "
-		"port 0x%03X.\n", cmdargs.port);
-	return err;
-}
-
 static void print_banner(int forceprint)
 {
 	const char *str =
 		"Catalyst PCIBX32 PCI Extender control utility version " VERSION "\n"
 		"\n"
-		"Copyright 2006 Michael Buesch <mbuesch@freenet.de>\n"
+		"Copyright 2006-2009 Michael Buesch <mb@bu3sch.de>\n"
 		"Licensed under the GNU General Public License v2+\n"
 		"\n";
 	if (forceprint)
@@ -276,7 +245,7 @@ static void print_usage(int argc, char **argv)
 	prdata("  -v|--version          Print version\n");
 	prdata("  -h|--help             Print this help\n");
 	prdata("\n");
-	prdata("  -p|--port 0x378       Port base address (Default: 0x378)\n");
+	prdata("  -p|--port /dev/parportX  Parport device (Default: /dev/parport0)\n");
 	prdata("  -P|--pci1 BOOL        If true, PCI_1 (default), otherwise PCI_2. (See JP15)\n");
 	prdata("  -s|--sched POLICY     Scheduling policy (normal, fifo, rr)\n");
 	prdata("  -c|--cycle DELAY      Execute the commands in a cycle and delay\n");
@@ -380,6 +349,7 @@ static int cmp_arg(char **argv, int *pos,
 		((res) == ARG_MATCH);			\
 	})
 
+#if 0
 static int parse_hexval(const char *str,
 			uint32_t *value,
 			const char *param)
@@ -403,6 +373,7 @@ error:
 	}
 	return -1;
 }
+#endif
 
 static int parse_bool(const char *str,
 		      const char *param)
@@ -532,9 +503,8 @@ static int parse_args(int argc, char **argv)
 {
 	int i, err;
 	char *param;
-	uint32_t value;
 
-	cmdargs.port = 0x378;
+	cmdargs.port = "/dev/parport0";
 	cmdargs.is_PCI_1 = 1;
 	cmdargs.sched = SCHED_OTHER;
 	cmdargs.cycle = -1;
@@ -548,10 +518,7 @@ static int parse_args(int argc, char **argv)
 		} else if (arg_match(argv, &i, "--verbose", "-V", 0)) {
 			cmdargs.verbose = 1;
 		} else if (arg_match(argv, &i, "--port", "-p", &param)) {
-			err = parse_hexval(param, &value, "--port");
-			if (err < 0)
-				goto error;
-			cmdargs.port = value;
+			cmdargs.port = param;
 		} else if (arg_match(argv, &i, "--pci1", "-P", &param)) {
 			err = parse_bool(param, "--pci1");
 			if (err < 0)
@@ -713,14 +680,11 @@ int main(int argc, char **argv)
 		goto out;
 	print_banner(0);
 
-	err = request_permissions();
-	if (err)
-		goto out;
 	err = request_priority();
 	if (err)
 		goto out;
 
-	err = init_device(&dev);
+	err = pcibx_device_init(&dev, cmdargs.port, cmdargs.is_PCI_1);
 	if (err)
 		goto out;
 	gettimeofday(&starttime, NULL);
@@ -730,7 +694,7 @@ int main(int argc, char **argv)
 	while (1) {
 		err = send_commands(&dev);
 		if (err)
-			goto out;
+			goto out_exit_dev;
 		if (cmdargs.cycle < 0)
 			break;
 		if (nrcycle > 0)
@@ -741,6 +705,8 @@ int main(int argc, char **argv)
 			msleep(cmdargs.cycle);
 	}
 
+out_exit_dev:
+	pcibx_device_exit(&dev);
 out:
 	return err ? 1 : 0;
 }
