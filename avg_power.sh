@@ -64,10 +64,9 @@ va12=$(echo "$S $avg_v12 * $avg_a12" | bc)
 va33=$(echo "$S $avg_v33 * $avg_a33" | bc)
 va_all=$(echo "$S $va5 + $va12 + $va33" | bc)
 
-echo "average currents:"
-echo "5V line:    $avg_a5 Ampere  (= $va5 VA)"
-echo "12V line:   $avg_a12 Ampere  (= $va12 VA)"
-echo "3.3V line:  $avg_a33 Ampere  (= $va33 VA)"
+echo "5V line:     $avg_v5 Volts,  $avg_a5 Ampere  => $va5 VA"
+echo "12V line:   $avg_v12 Volts,  $avg_a12 Ampere  => $va12 VA"
+echo "3.3V line:   $avg_v33 Volts,  $avg_a33 Ampere  => $va33 VA"
 echo "-------------"
 echo "= $va_all VA"
 
