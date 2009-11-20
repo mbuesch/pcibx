@@ -83,26 +83,27 @@ static void plot_text(const char *fmt, ...)
 	va_end(va);
 }
 
-/* Helper function to plot data values. */
-static void plot_data(const char *text, float data)
+static void print_data(const char *text, float data)
 {
 	struct timeval tmp, tv;
 	int err;
 
-	err = gettimeofday(&tmp, NULL);
-	if (err) {
-		prdata("gettimeofday() failure!\n");
-		return;
+	if (cmdargs.verbose >= 1) {
+		err = gettimeofday(&tmp, NULL);
+		if (err) {
+			prerror("gettimeofday() failure!\n");
+			return;
+		}
+		err = timeval_subtract(&tv, &tmp, &starttime);
+		if (err) {
+			prerror("timeval_subtract() went negative!\n");
+			return;
+		}
+		prinfo("%ld.%06ld %f  # ",
+		       tv.tv_sec, tv.tv_usec,
+		       data);
 	}
-	err = timeval_subtract(&tv, &tmp, &starttime);
-	if (err) {
-		prdata("timeval_subtract() went negative!\n");
-		return;
-	}
-	prdata("%ld.%06ld %f  # ",
-	       tv.tv_sec, tv.tv_usec,
-	       data);
-	prdata(text, data);
+	prinfo(text, data);
 }
 
 static int send_commands(struct pcibx_device *dev)
@@ -155,39 +156,39 @@ static int send_commands(struct pcibx_device *dev)
 			break;
 		case CMD_MEASUREFREQ:
 			f = pcibx_cmd_sysfreq(dev);
-			plot_data("Measured system frequency: %f Mhz\n", f);
+			print_data("Measured system frequency: %f Mhz\n", f);
 			break;
 		case CMD_MEASUREV25REF:
 			f = pcibx_cmd_measure(dev, MEASURE_V25REF);
-			plot_data("Measured +2.5V Reference: %f Volt\n", f);
+			print_data("Measured +2.5V Reference: %f Volt\n", f);
 			break;
 		case CMD_MEASUREV12UUT:
 			f = pcibx_cmd_measure(dev, MEASURE_V12UUT);
-			plot_data("Measured +12V UUT: %f Volt\n", f);
+			print_data("Measured +12V UUT: %f Volt\n", f);
 			break;
 		case CMD_MEASUREV5UUT:
 			f = pcibx_cmd_measure(dev, MEASURE_V5UUT);
-			plot_data("Measured +5V UUT: %f Volt\n", f);
+			print_data("Measured +5V UUT: %f Volt\n", f);
 			break;
 		case CMD_MEASUREV33UUT:
 			f = pcibx_cmd_measure(dev, MEASURE_V33UUT);
-			plot_data("Measured +33V UUT: %f Volt\n", f);
+			print_data("Measured +33V UUT: %f Volt\n", f);
 			break;
 		case CMD_MEASUREV5AUX:
 			f = pcibx_cmd_measure(dev, MEASURE_V5AUX);
-			plot_data("Measured +5V AUX: %f Volt\n", f);
+			print_data("Measured +5V AUX: %f Volt\n", f);
 			break;
 		case CMD_MEASUREA5:
 			f = pcibx_cmd_measure(dev, MEASURE_A5);
-			plot_data("Measured +5V Current: %f Ampere\n", f);
+			print_data("Measured +5V Current: %f Ampere\n", f);
 			break;
 		case CMD_MEASUREA12:
 			f = pcibx_cmd_measure(dev, MEASURE_A12);
-			plot_data("Measured +12V Current: %f Ampere\n", f);
+			print_data("Measured +12V Current: %f Ampere\n", f);
 			break;
 		case CMD_MEASUREA33:
 			f = pcibx_cmd_measure(dev, MEASURE_A33);
-			plot_data("Measured +3.3V Current: %f Ampere\n", f);
+			print_data("Measured +3.3V Current: %f Ampere\n", f);
 			break;
 		case CMD_FASTRAMP:
 			pcibx_cmd_ramp(dev, cmd->u.boolean);
@@ -203,7 +204,8 @@ static int send_commands(struct pcibx_device *dev)
 			return -1;
 		}
 	}
-	prinfo("All commands sent.\n");
+	if (cmdargs.verbose >= 2)
+		prinfo("All commands sent.\n");
 
 	return 0;
 }
@@ -223,55 +225,50 @@ static int request_priority(void)
 	return err;
 }
 
-static void print_banner(int forceprint)
+static void print_banner(void)
 {
-	const char *str =
-		"Catalyst PCIBX32 PCI Extender control utility version " VERSION "\n"
-		"\n"
-		"Copyright 2006-2009 Michael Buesch <mb@bu3sch.de>\n"
-		"Licensed under the GNU General Public License v2+\n"
-		"\n";
-	if (forceprint)
-		prdata(str);
-	else
-		prinfo(str);
+	prinfo("Catalyst PCIBX32 PCI Extender control utility version " VERSION "\n"
+	       "\n"
+	       "Copyright 2006-2009 Michael Buesch <mb@bu3sch.de>\n"
+	       "Licensed under the GNU General Public License v2+\n"
+	       "\n");
 }
 
 static void print_usage(int argc, char **argv)
 {
-	prdata("Usage: %s [OPTION]\n", argv[0]);
-	prdata("  -V|--verbose          Be verbose\n");
-	prdata("  -v|--version          Print version\n");
-	prdata("  -h|--help             Print this help\n");
-	prdata("\n");
-	prdata("  -p|--port /dev/parportX  Parport device (Default: /dev/parport0)\n");
-	prdata("  -P|--pci1 BOOL        If true, PCI_1 (default), otherwise PCI_2. (See JP15)\n");
-	prdata("  -s|--sched POLICY     Scheduling policy (normal, fifo, rr)\n");
-	prdata("  -c|--cycle DELAY      Execute the commands in a cycle and delay\n");
-	prdata("                        DELAY msecs after each cycle\n");
-	prdata("  -n|--nrcycle COUNT    Cycle COUNT times. 0 == infinite (default)\n");
-	prdata("\n");
-	prdata("Device commands\n");
-	prdata("  --cmd-glob ON/OFF     Turn Global power ON/OFF (does not turn ON UUT Voltages)\n");
-	prdata("  --cmd-uut ON/OFF      Turn UUT Voltages ON/OFF (also turns Global power ON)\n");
-	prdata("  --cmd-printboardid    Print the Board ID\n");
-	prdata("  --cmd-printfirmrev    Print the Firmware revision\n");
-	prdata("  --cmd-printstatus     Print the Board Status Bits\n");
-	prdata("  --cmd-clearbitstat    Clear 32/64 bit status\n");
-	prdata("  --cmd-aux5 ON/OFF     Turn +5V Aux ON or OFF\n");
-	prdata("  --cmd-aux33 ON/OFF    Turn +3.3V Aux ON or OFF\n");
-	prdata("  --cmd-measurefreq     Measure system frequency\n");
-	prdata("  --cmd-measurev25ref   Measure +2.5V Reference\n");
-	prdata("  --cmd-measurev12uut   Measure +12V UUT\n");
-	prdata("  --cmd-measurev5uut    Measure +5V UUT\n");
-	prdata("  --cmd-measurev33uut   Measure +3.3V UUT\n");
-	prdata("  --cmd-measurev5aux    Measure +5V AUX\n");
-	prdata("  --cmd-measurea5       Measure +5V Current\n");
-	prdata("  --cmd-measurea12      Measure +12V Current\n");
-	prdata("  --cmd-measurea33      Measure +3.3V Current\n");
-	prdata("  --cmd-fastramp ON/OFF Select slow/fast +5V ramp\n");
-	prdata("  --cmd-rst 0.150       Set RST# (reset) delay (in seconds)\n");
-	prdata("  --cmd-rstdefault      Set RST# to default (150msec)\n");
+	prinfo("Usage: %s [OPTION]\n", argv[0]);
+	prinfo("  -V|--verbose LEVEL    Verbosity level 0-2 (default: 0)\n");
+	prinfo("  -v|--version          Print version\n");
+	prinfo("  -h|--help             Print this help\n");
+	prinfo("\n");
+	prinfo("  -p|--port /dev/parportX  Parport device (Default: /dev/parport0)\n");
+	prinfo("  -P|--pci1 BOOL        If true, PCI_1 (default), otherwise PCI_2. (See JP15)\n");
+	prinfo("  -s|--sched POLICY     Scheduling policy (normal, fifo, rr)\n");
+	prinfo("  -c|--cycle DELAY      Execute the commands in a cycle and delay\n");
+	prinfo("                        DELAY msecs after each cycle\n");
+	prinfo("  -n|--nrcycle COUNT    Cycle COUNT times. 0 == infinite (default)\n");
+	prinfo("\n");
+	prinfo("Device commands\n");
+	prinfo("  --cmd-glob ON/OFF     Turn Global power ON/OFF (does not turn ON UUT Voltages)\n");
+	prinfo("  --cmd-uut ON/OFF      Turn UUT Voltages ON/OFF (also turns Global power ON)\n");
+	prinfo("  --cmd-printboardid    Print the Board ID\n");
+	prinfo("  --cmd-printfirmrev    Print the Firmware revision\n");
+	prinfo("  --cmd-printstatus     Print the Board Status Bits\n");
+	prinfo("  --cmd-clearbitstat    Clear 32/64 bit status\n");
+	prinfo("  --cmd-aux5 ON/OFF     Turn +5V Aux ON or OFF\n");
+	prinfo("  --cmd-aux33 ON/OFF    Turn +3.3V Aux ON or OFF\n");
+	prinfo("  --cmd-measurefreq     Measure system frequency\n");
+	prinfo("  --cmd-measurev25ref   Measure +2.5V Reference\n");
+	prinfo("  --cmd-measurev12uut   Measure +12V UUT\n");
+	prinfo("  --cmd-measurev5uut    Measure +5V UUT\n");
+	prinfo("  --cmd-measurev33uut   Measure +3.3V UUT\n");
+	prinfo("  --cmd-measurev5aux    Measure +5V AUX\n");
+	prinfo("  --cmd-measurea5       Measure +5V Current\n");
+	prinfo("  --cmd-measurea12      Measure +12V Current\n");
+	prinfo("  --cmd-measurea33      Measure +3.3V Current\n");
+	prinfo("  --cmd-fastramp ON/OFF Select slow/fast +5V ramp\n");
+	prinfo("  --cmd-rst 0.150       Set RST# (reset) delay (in seconds)\n");
+	prinfo("  --cmd-rstdefault      Set RST# to default (150msec)\n");
 }
 
 #define ARG_MATCH		0
@@ -510,14 +507,16 @@ static int parse_args(int argc, char **argv)
 
 	for (i = 1; i < argc; i++) {
 		if (arg_match(argv, &i, "--version", "-v", 0)) {
-			print_banner(1);
+			print_banner();
 			return 1;
 		} else if (arg_match(argv, &i, "--help", "-h", 0)) {
-			print_banner(1);
+			print_banner();
 			print_usage(argc, argv);
 			return 1;
-		} else if (arg_match(argv, &i, "--verbose", "-V", 0)) {
-			cmdargs.verbose = 1;
+		} else if (arg_match(argv, &i, "--verbose", "-V", &param)) {
+			err = parse_int(param, &cmdargs.verbose, "--verbose");
+			if (err)
+				goto error;
 		} else if (arg_match(argv, &i, "--port", "-p", &param)) {
 			cmdargs.port = param;
 		} else if (arg_match(argv, &i, "--pci1", "-P", &param)) {
@@ -678,7 +677,6 @@ int main(int argc, char **argv)
 		return 0;
 	else if (err != 0)
 		goto out;
-	print_banner(0);
 
 	err = request_priority();
 	if (err)

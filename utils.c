@@ -89,9 +89,6 @@ int prinfo(const char *fmt, ...)
 	int ret;
 	va_list va;
 
-	if (!cmdargs.verbose)
-		return 0;
-
 	va_start(va, fmt);
 	ret = vfprintf(stdout, fmt, va);
 	va_end(va);
@@ -106,18 +103,6 @@ int prerror(const char *fmt, ...)
 
 	va_start(va, fmt);
 	ret = vfprintf(stderr, fmt, va);
-	va_end(va);
-
-	return ret;
-}
-
-int prdata(const char *fmt, ...)
-{
-	int ret;
-	va_list va;
-
-	va_start(va, fmt);
-	ret = vfprintf(stdout, fmt, va);
 	va_end(va);
 
 	return ret;

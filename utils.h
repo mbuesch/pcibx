@@ -19,7 +19,6 @@
 
 int prinfo(const char *fmt, ...) ATTRIBUTE_FORMAT(printf, 1, 2);
 int prerror(const char *fmt, ...) ATTRIBUTE_FORMAT(printf, 1, 2);
-int prdata(const char *fmt, ...) ATTRIBUTE_FORMAT(printf, 1, 2);
 
 void internal_error(const char *message);
 #define internal_error_on(condition) \

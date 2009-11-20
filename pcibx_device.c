@@ -222,7 +222,7 @@ void pcibx_device_exit(struct pcibx_device *dev)
 
 static void prsendinfo(const char *command)
 {
-	if (cmdargs.verbose)
+	if (cmdargs.verbose >= 2)
 		prinfo("Sending command: %s\n", command);
 }
 
