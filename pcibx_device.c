@@ -315,7 +315,7 @@ float pcibx_cmd_sysfreq(struct pcibx_device *dev)
 	v = pcibx_read(dev, PCIBX_REG_FREQMEASURE_2);
 	tmp |= (v << 16);
 
-	mhz = tmp * 100 / 1048575;
+	mhz = (float)tmp * 100.0 / 1048575.0;
 
 	return mhz;
 }
@@ -341,9 +341,9 @@ float pcibx_cmd_measure(struct pcibx_device *dev, enum measure_id id)
 	tmp |= (d1 << 8);
 
 	if (id == MEASURE_V12UUT)
-		ret = tmp * 5.75 * 2.5 / 4096;
+		ret = (float)tmp * 5.75 * 2.5 / 4096.0;
 	else
-		ret = tmp * 2.26 * 2.5 / 4096;
+		ret = (float)tmp * 2.26 * 2.5 / 4096.0;
 
 	return ret;
 }
