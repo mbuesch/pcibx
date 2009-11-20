@@ -376,3 +376,9 @@ void pcibx_cmd_rstdefault(struct pcibx_device *dev)
 	pcibx_write(dev, PCIBX_REG_RST_1, 0);
 	pcibx_write(dev, PCIBX_REG_RST_2, 0);
 }
+
+uint8_t pcibx_cmd_getpme(struct pcibx_device *dev)
+{
+	prsendinfo("PME# status");
+	return pcibx_read(dev, PCIBX_REG_PME);
+}

@@ -49,6 +49,7 @@ enum command_id {
 	CMD_FASTRAMP,
 	CMD_RST,
 	CMD_RSTDEFAULT,
+	CMD_GETPME,
 };
 
 struct pcibx_command {

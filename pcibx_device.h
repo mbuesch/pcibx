@@ -37,6 +37,7 @@
 #define PCIBX_REG_MEASURE_STROBE	0x69
 #define PCIBX_REG_MEASURE_DATA0		0x6A
 #define PCIBX_REG_MEASURE_DATA1		0x6B
+#define PCIBX_REG_PME			0x6F
 #define PCIBX_REG_RST_0			0x71
 #define PCIBX_REG_RST_1			0x72
 #define PCIBX_REG_RST_2			0x73
@@ -92,5 +93,6 @@ float pcibx_cmd_measure(struct pcibx_device *dev, enum measure_id id);
 void pcibx_cmd_ramp(struct pcibx_device *dev, int fast);
 void pcibx_cmd_rst(struct pcibx_device *dev, double sec);
 void pcibx_cmd_rstdefault(struct pcibx_device *dev);
+uint8_t pcibx_cmd_getpme(struct pcibx_device *dev);
 
 #endif /* PCIBX_DEVICE_H_ */

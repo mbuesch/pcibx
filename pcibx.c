@@ -71,40 +71,27 @@ static int timeval_subtract(struct timeval *result,
 	return x->tv_sec < y->tv_sec;
 }
 
-/* Helper function to plot informational text. */
-static void plot_text(const char *fmt, ...) ATTRIBUTE_FORMAT(printf, 1, 2);
-static void plot_text(const char *fmt, ...)
-{
-	va_list va;
-
-	va_start(va, fmt);
-	fprintf(stdout, "# ");
-	vfprintf(stdout, fmt, va);
-	va_end(va);
-}
-
-static void print_data(const char *text, float data)
-{
-	struct timeval tmp, tv;
-	int err;
-
-	if (cmdargs.verbose >= 1) {
-		err = gettimeofday(&tmp, NULL);
-		if (err) {
-			prerror("gettimeofday() failure!\n");
-			return;
-		}
-		err = timeval_subtract(&tv, &tmp, &starttime);
-		if (err) {
-			prerror("timeval_subtract() went negative!\n");
-			return;
-		}
-		prinfo("%ld.%06ld %f  # ",
-		       tv.tv_sec, tv.tv_usec,
-		       data);
-	}
-	prinfo(text, data);
-}
+#define print_data(description, format, units, ...) do { \
+	struct timeval tmp, tv;						\
+	int err;							\
+									\
+	if (cmdargs.verbose >= 1) {					\
+		err = gettimeofday(&tmp, NULL);				\
+		if (err) {						\
+			prerror("gettimeofday() failure!\n");		\
+			break;						\
+		}							\
+		err = timeval_subtract(&tv, &tmp, &starttime);		\
+		if (err) {						\
+			prerror("timeval_subtract() went negative!\n");	\
+			break;						\
+		}							\
+		prinfo("%ld.%06ld " format "  # ",			\
+		       tv.tv_sec, tv.tv_usec,				\
+		       __VA_ARGS__);					\
+	}								\
+	prinfo(description ": " format " " units "\n", __VA_ARGS__);	\
+} while (0)
 
 static int send_commands(struct pcibx_device *dev)
 {
@@ -125,15 +112,15 @@ static int send_commands(struct pcibx_device *dev)
 			break;
 		case CMD_PRINTBOARDID:
 			v = pcibx_cmd_getboardid(dev);
-			plot_text("Board ID: 0x%02X\n", v);
+			print_data("Board ID", "0x%02X", "", v);
 			break;
 		case CMD_PRINTFIRMREV:
 			v = pcibx_cmd_getfirmrev(dev);
-			plot_text("Firmware revision: 0x%02X\n", v);
+			print_data("Firmware revision", "0x%02X", "", v);
 			break;
 		case CMD_PRINTSTATUS:
 			v = pcibx_cmd_getstatus(dev);
-			plot_text("Board status:  %s;  %s;  %s;  %s;  %s\n",
+			print_data("Board status", "%s;  %s;  %s;  %s;  %s", "",
 			       (v & PCIBX_STATUS_RSTDEASS) ? "RST# de-asserted"
 							   : "RST# asserted",
 			       (v & PCIBX_STATUS_64BIT) ? "64-bit operation established"
@@ -156,39 +143,39 @@ static int send_commands(struct pcibx_device *dev)
 			break;
 		case CMD_MEASUREFREQ:
 			f = pcibx_cmd_sysfreq(dev);
-			print_data("Measured system frequency: %f Mhz\n", f);
+			print_data("Measured system frequency", "%f", "Mhz", f);
 			break;
 		case CMD_MEASUREV25REF:
 			f = pcibx_cmd_measure(dev, MEASURE_V25REF);
-			print_data("Measured +2.5V Reference: %f Volt\n", f);
+			print_data("Measured +2.5V Reference", "%f", "Volt", f);
 			break;
 		case CMD_MEASUREV12UUT:
 			f = pcibx_cmd_measure(dev, MEASURE_V12UUT);
-			print_data("Measured +12V UUT: %f Volt\n", f);
+			print_data("Measured +12V UUT", "%f", "Volt", f);
 			break;
 		case CMD_MEASUREV5UUT:
 			f = pcibx_cmd_measure(dev, MEASURE_V5UUT);
-			print_data("Measured +5V UUT: %f Volt\n", f);
+			print_data("Measured +5V UUT", "%f", "Volt", f);
 			break;
 		case CMD_MEASUREV33UUT:
 			f = pcibx_cmd_measure(dev, MEASURE_V33UUT);
-			print_data("Measured +33V UUT: %f Volt\n", f);
+			print_data("Measured +33V UUT", "%f", "Volt", f);
 			break;
 		case CMD_MEASUREV5AUX:
 			f = pcibx_cmd_measure(dev, MEASURE_V5AUX);
-			print_data("Measured +5V AUX: %f Volt\n", f);
+			print_data("Measured +5V AUX", "%f", "Volt", f);
 			break;
 		case CMD_MEASUREA5:
 			f = pcibx_cmd_measure(dev, MEASURE_A5);
-			print_data("Measured +5V Current: %f Ampere\n", f);
+			print_data("Measured +5V Current", "%f", "Ampere", f);
 			break;
 		case CMD_MEASUREA12:
 			f = pcibx_cmd_measure(dev, MEASURE_A12);
-			print_data("Measured +12V Current: %f Ampere\n", f);
+			print_data("Measured +12V Current", "%f", "Ampere", f);
 			break;
 		case CMD_MEASUREA33:
 			f = pcibx_cmd_measure(dev, MEASURE_A33);
-			print_data("Measured +3.3V Current: %f Ampere\n", f);
+			print_data("Measured +3.3V Current", "%f", "Ampere", f);
 			break;
 		case CMD_FASTRAMP:
 			pcibx_cmd_ramp(dev, cmd->u.boolean);
@@ -198,6 +185,10 @@ static int send_commands(struct pcibx_device *dev)
 			break;
 		case CMD_RSTDEFAULT:
 			pcibx_cmd_rstdefault(dev);
+			break;
+		case CMD_GETPME:
+			v = pcibx_cmd_getpme(dev);
+			print_data("PME# status", "0x%02X", "", v);
 			break;
 		default:
 			internal_error("invalid command");
@@ -623,7 +614,10 @@ static int parse_args(int argc, char **argv)
 			err = add_command(CMD_RSTDEFAULT);
 			if (err)
 				goto error;
-
+		} else if (arg_match(argv, &i, "--cmd-getpme", 0, 0)) {
+			err = add_command(CMD_GETPME);
+			if (err)
+				goto error;
 		} else {
 			prerror("Unrecognized argument: %s\n", argv[i]);
 			goto error;
